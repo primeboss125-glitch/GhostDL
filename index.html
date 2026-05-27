@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GHOST DL — MediaFire Multi-Downloader</title>
+    <style>
+        :root {
+            --bg: #080808;
+            --surface: #111111;
+            --surface2: #181818;
+            --surface3: #1e1e1e;
+            --yellow: #f5c842;
+            --yellow-glow: #ffe082;
+            --yellow-dark: #b8960f;
+            --gold: #e2b631;
+            --gold-light: #fde16d;
+            --text: #e0e0e0;
+            --text-dim: #999;
+            --danger: #ff3b3b;
+            --success: #4caf50;
+            --info: #ffb74d;
+            --border: #2a2a2a;
+            --border-glow: #5c4a1f;
+            --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(180, 140, 30, 0.08);
+            --card-hover-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), 0 4px 20px rgba(220, 180, 40, 0.2);
+            --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', monospace;
+            --font-sans: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+            --radius: 14px;
+            --radius-sm: 8px;
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            perspective: 1200px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ============ FLOATING GHOSTS & SKULLS BG ============ */
+        .ghost-particle {
+            position: fixed;
+            pointer-events: none;
+            z-index: 0;
+            animation: floatUp var(--dur) ease-in infinite;
+            opacity: 0;
+            font-size: var(--sz);
+            left: var(--x);
+            bottom: -80px;
+            filter: blur(var(--blur, 0px));
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) translateX(0) rotate(0deg) scale(0.6); opacity: 0; }
+            10% { opacity: var(--op, 0.5); }
+            80% { opacity: var(--op, 0.5); }
+            100% { transform: translateY(-110vh) translateX(var(--drift)) rotate(var(--rot)) scale(1.2); opacity: 0; }
+        }
+        @keyframes skullPulse {
+            0%, 100% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 8px #f5c84266); }
+            25% { transform: scale(1.15) rotate(4deg); filter: drop-shadow(0 0 18px #f5c842aa); }
+            50% { transform: scale(1.05) rotate(-3deg); filter: drop-shadow(0 0 12px #f5c84288); }
+            75% { transform: scale(1.12) rotate(2deg); filter: drop-shadow(0 0 20px #f5c842bb); }
+        }
+        @keyframes skullFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-14px); }
+        }
+        @keyframes glowPulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(245, 200, 66, 0.25), 0 0 60px rgba(245, 200, 66, 0.08); }
+            50% { box-shadow: 0 0 35px rgba(245, 200, 66, 0.5), 0 0 90px rgba(245, 200, 66, 0.2); }
+        }
+        @keyframes borderGlow {
+            0%, 100% { border-color: #5c4a1f; }
+            50% { border-color: #b8960f; }
+        }
+        @keyframes progressShine {
+            0% { background-position: -200% center; }
+            100% { background-position: 300% center; }
+        }
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0) rotateY(0deg); }
+            25% { transform: translateY(-8px) rotateY(8deg); }
+            50% { transform: translateY(-3px) rotateY(0deg); }
+            75% { transform: translateY(-10px) rotateY(-6deg); }
+        }
+
+        /* ============ SIDEBAR ============ */
+        .sidebar {
+            width: 260px;
+            min-width: 260px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 28px 18px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            z-index: 10;
+            box-shadow: 4px 0 30px rgba(0, 0, 0, 0.5);
+            transform-style: preserve-3d;
+            transition: var(--transition);
+        }
+        .sidebar::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 20%, rgba(245, 200, 66, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+            border-radius: 0;
+        }
+        .logo-container {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 32px;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            animation: logoFloat 5s ease-in-out infinite;
+        }
+        .logo-icon {
+            font-size: 64px;
+            display: flex;
+            gap: 4px;
+            filter: drop-shadow(0 8px 20px rgba(245, 200, 66, 0.5));
+            transition: var(--transition);
+            line-height: 1;
+        }
+        .logo-icon .skull {
+            animation: skullPulse 2.5s ease-in-out infinite;
+            display: inline-block;
+        }
+        .logo-icon .ghost {
+            animation: skullFloat 3s ease-in-out infinite;
+            display: inline-block;
+            animation-delay: 0.4s;
+        }
+        .logo-text {
+            font-weight: 900;
+            font-size: 1.6rem;
+            letter-spacing: 3px;
+            background: linear-gradient(180deg, #fde16d 0%, #b8960f 50%, #8b6e0a 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-top: 2px;
+            text-shadow: none;
+            filter: drop-shadow(0 2px 6px rgba(200, 160, 30, 0.4));
+        }
+        .logo-subtitle {
+            font-size: 0.65rem;
+            letter-spacing: 5px;
+            color: #8b7a3a;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+        .sidebar-stats {
+            z-index: 1;
+            width: 100%;
+            background: var(--surface2);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-top: 8px;
+            border: 1px solid var(--border);
+            transform-style: preserve-3d;
+            transition: var(--transition);
+        }
+        .sidebar-stats:hover {
+            border-color: var(--border-glow);
+            box-shadow: 0 0 25px rgba(245, 200, 66, 0.1);
+            transform: translateZ(6px);
+        }
+        .sidebar-stats .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            border-bottom: 1px solid #1a1a1a;
+        }
+        .sidebar-stats .stat-row:last-child {
+            border-bottom: none;
+        }
+        .sidebar-stats .stat-val {
+            color: var(--yellow);
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+        .sidebar-footer {
+            margin-top: auto;
+            z-index: 1;
+            font-size: 0.65rem;
+            color: #555;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        /* ============ MAIN CONTENT ============ */
+        .main-content {
+            flex: 1;
+            padding: 24px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: relative;
+            z-index: 2;
+            max-width: 1200px;
+            min-width: 0;
+        }
+        .top-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .top-bar h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #fff;
+            text-shadow: 0 0 40px rgba(245, 200, 66, 0.3);
+            flex: 1;
+            min-width: 200px;
+        }
+        .global-badge {
+            background: var(--surface2);
+            border: 1px solid var(--border-glow);
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 0.8rem;
+            color: var(--yellow);
+            font-weight: 600;
+            letter-spacing: 1px;
+            animation: borderGlow 3s ease-in-out infinite;
+            white-space: nowrap;
+        }
+
+        /* ============ INPUT CARD ============ */
+        .input-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            box-shadow: var(--card-shadow);
+            transform-style: preserve-3d;
+            transition: var(--transition);
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .input-card:hover {
+            box-shadow: var(--card-hover-shadow);
+            border-color: var(--border-glow);
+            transform: translateZ(4px);
+        }
+        .input-card input {
+            flex: 1;
+            min-width: 250px;
+            padding: 14px 18px;
+            font-size: 0.95rem;
+            border-radius: var(--radius-sm);
+            background: #0a0a0a;
+            color: #fff;
+            border: 1px solid #333;
+            font-family: var(--font-sans);
+            transition: var(--transition);
+            letter-spacing: 0.3px;
+        }
+        .input-card input:focus {
+            outline: none;
+            border-color: var(--yellow);
+            box-shadow: 0 0 20px rgba(245, 200, 66, 0.2);
+            background: #0d0d0d;
+        }
+        .input-card input::placeholder { color: #555; }
+        .btn {
+            padding: 13px 22px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            letter-spacing: 0.6px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            border: none;
+            transition: var(--transition);
+            white-space: nowrap;
+            font-family: var(--font-sans);
+            transform-style: preserve-3d;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn:active { transform: scale(0.96) translateZ(-2px); }
+        .btn-primary {
+            background: linear-gradient(145deg, #e2b631 0%, #b8960f 60%, #8b6e0a 100%);
+            color: #1a1a0a;
+            box-shadow: 0 6px 20px rgba(200, 150, 30, 0.35), 0 2px 6px rgba(0, 0, 0, 0.4);
+            border: 1px solid #c9a520;
+            font-weight: 800;
+        }
+        .btn-primary:hover {
+            box-shadow: 0 10px 30px rgba(245, 200, 66, 0.5), 0 4px 12px rgba(0, 0, 0, 0.5);
+            transform: translateY(-2px) translateZ(4px);
+            background: linear-gradient(145deg, #f0c840 0%, #c9a520 60%, #9b7e14 100%);
+        }
+        .btn-secondary { background: var(--surface3); color: #ccc; border: 1px solid #444; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
+        .btn-secondary:hover { border-color: #888; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); transform: translateY(-1px) translateZ(2px); color: #fff; }
+        .btn-danger { background: #2a1010; color: #ff6b6b; border: 1px solid #5a2020; box-shadow: 0 4px 12px rgba(180, 30, 30, 0.2); }
+        .btn-danger:hover { background: #3a1515; border-color: #8a3030; box-shadow: 0 8px 22px rgba(200, 40, 40, 0.35); transform: translateY(-1px) translateZ(2px); }
+        .btn-sm { padding: 8px 14px; font-size: 0.75rem; letter-spacing: 0.4px; border-radius: 6px; }
+        .thread-select {
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            background: #0a0a0a;
+            color: var(--yellow);
+            border: 1px solid #444;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font-sans);
+            transition: var(--transition);
+        }
+        .thread-select:focus { outline: none; border-color: var(--yellow); box-shadow: 0 0 15px rgba(245, 200, 66, 0.2); }
+
+        /* ============ DOWNLOAD LIST ============ */
+        .section-title { font-size: 1rem; font-weight: 700; letter-spacing: 2px; color: #888; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+        .section-title .count-badge { background: var(--yellow-dark); color: #000; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 900; }
+        .downloads-container { display: flex; flex-direction: column; gap: 12px; max-height: 500px; overflow-y: auto; padding-right: 6px; scroll-behavior: smooth; }
+        .downloads-container::-webkit-scrollbar { width: 5px; }
+        .downloads-container::-webkit-scrollbar-track { background: transparent; }
+        .downloads-container::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .download-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            box-shadow: var(--card-shadow);
+            transform-style: preserve-3d;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+        .download-card:hover {
+            box-shadow: var(--card-hover-shadow);
+            border-color: var(--border-glow);
+            transform: translateZ(5px) translateY(-2px);
+        }
+        .download-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--yellow), transparent);
+            opacity: 0;
+            transition: var(--transition);
+        }
+        .download-card.downloading::before {
+            opacity: 1;
+            animation: progressShine 2s linear infinite;
+            background-size: 200% 100%;
+            background-image: linear-gradient(90deg, transparent, var(--yellow), var(--gold-light), var(--yellow), transparent);
+        }
+        .download-card.completed { border-color: #2a4a2a; }
+        .download-card.completed::before { opacity: 0.6; background: #4caf50; }
+        .download-card.paused { border-color: #5a3a10; opacity: 0.85; }
+        .download-card.paused::before { opacity: 0.5; background: #ff9800; }
+        .download-card .card-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+        .download-card .file-icon { font-size: 1.6rem; animation: skullFloat 4s ease-in-out infinite; }
+        .download-card .file-name { flex: 1; font-weight: 700; font-size: 0.9rem; color: #ddd; word-break: break-all; min-width: 150px; }
+        .download-card .status-badge { font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; }
+        
+        .status-downloading { background: #1a2a0a; color: #8bc34a; animation: borderGlow 2s ease-in-out infinite; }
+        .status-completed { background: #0a1a0a; color: #4caf50; }
+        .status-queued { background: #1a1a1a; color: #888; }
+        .status-failed { background: #2a0a0a; color: #f44336; }
+        
+        .download-card .progress-wrap { background: #0a0a0a; border-radius: 6px; height: 10px; overflow: hidden; margin: 8px 0; border: 1px solid #1a1a1a; position: relative; }
+        .download-card .progress-fill { height: 100%; border-radius: 6px; transition: width 0.3s ease; background: linear-gradient(90deg, #b8960f, #f5c842, #fde16d); background-size: 200% 100%; animation: progressShine 2.5s linear infinite; position: relative; }
+        .download-card.completed .progress-fill { background: #4caf50; animation: none; width: 100% !important; }
+        
+        .download-card .card-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.72rem; color: #888; font-family: var(--font-mono); }
+        .download-card .card-meta span { display: flex; align-items: center; gap: 4px; }
+        .download-card .card-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+        /* ============ LOG ============ */
+        .log-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            box-shadow: var(--card-shadow);
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: #aaa;
+            line-height: 1.6;
+            transform-style: preserve-3d;
+            transition: var(--transition);
+        }
+        .log-panel:hover { border-color: var(--border-glow); transform: translateZ(3px); }
+        .log-panel::-webkit-scrollbar { width: 4px; }
+        .log-panel::-webkit-scrollbar-track { background: transparent; }
+        .log-panel::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 6px; }
+        .log-entry { padding: 2px 0; border-bottom: 1px solid #111; }
+        .log-entry.warn { color: #ffb74d; }
+        .log-entry.error { color: #f44336; }
+        .log-entry.success { color: #4caf50; }
+
+        /* ============ TOAST ============ */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .toast {
+            pointer-events: auto;
+            background: var(--surface2);
+            border: 1px solid var(--border-glow);
+            border-radius: var(--radius-sm);
+            padding: 12px 18px;
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.85rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+            animation: slideIn 0.4s ease-out, fadeOut 0.3s 2.5s ease-in forwards;
+            max-width: 380px;
+        }
+        @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateY(-20px); } }
+
+        /* ============ RESPONSIVE ============ */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; min-width: 100%; height: auto; flex-direction: row; flex-wrap: wrap; padding: 14px 16px; position: relative; gap: 12px; justify-content: center; }
+            .sidebar-stats { display: none; }
+            .sidebar-footer { display: none; }
+            .logo-container { margin-bottom: 0; flex-direction: row; gap: 10px; }
+            .logo-icon { font-size: 36px; }
+            .logo-text { font-size: 1.2rem; }
+            .main-content { padding: 16px; gap: 12px; }
+            .input-card { flex-direction: column; align-items: stretch; }
+            .input-card input { min-width: auto; }
+            .top-bar h1 { font-size: 1.3rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="offlineOverlay" style="position:fixed; inset:0; z-index:99999; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px;">
+        <div style="font-size: 4rem; margin-bottom: 10px; animation: skullFloat 3s ease-in-out infinite;">💀</div>
+        <h2 style="color:var(--yellow); font-size:2rem; margin-bottom:10px;">Ghost Engine Offline</h2>
+        <p style="color:var(--text-dim); max-width:500px; margin-bottom:20px; line-height:1.6;">
+            To unlock multi-threaded high-speed downloading directly to your device, your local backend daemon must be active.
+        </p>
+        <div style="background:var(--surface); padding:20px; border:1px solid var(--border-glow); border-radius:var(--radius); text-align:left; width:100%; max-width:600px;">
+            <h3 style="color:#fff; font-size:1rem; margin-bottom:10px;">Step 1: Install Termux</h3>
+            <p style="color:#aaa; font-size:0.85rem; margin-bottom:20px;">Download and open the Termux app on your Android device.</p>
+            
+            <h3 style="color:#fff; font-size:1rem; margin-bottom:10px;">Step 2: Run the Automated Setup</h3>
+            <p style="color:#aaa; font-size:0.85rem; margin-bottom:10px;">Copy the command below, paste it into Termux, and press Enter:</p>
+            <div style="background:#000; padding:15px; border-radius:6px; border:1px solid #333; font-family:var(--font-mono); color:var(--success); word-break:break-all; font-size:0.85rem;">
+                curl -sL https://raw.githubusercontent.com/YOUR_USERNAME/GhostDL/main/setup.sh | bash
+            </div>
+        </div>
+        <p style="margin-top:30px; color:var(--info); font-weight:bold; letter-spacing:1px; animation: glowPulse 2s infinite;">
+            ⏳ Listening for Engine connection... (Do not refresh)
+        </p>
+    </div>
+
+    <div id="particleContainer"></div>
+
+    <aside class="sidebar">
+        <div class="logo-container" title="GHOST DL — Spooky Fast Downloads">
+            <div class="logo-icon">
+                <span class="skull">💀</span><span class="ghost">👻</span>
+            </div>
+            <span class="logo-text">GHOST DL</span>
+            <span class="logo-subtitle">Serverless Manager</span>
+        </div>
+        <div class="sidebar-stats">
+            <div class="stat-row"><span>📦 Queued</span><span class="stat-val" id="statQueued">0</span></div>
+            <div class="stat-row"><span>⚡ Extracting</span><span class="stat-val" id="statActive">0</span></div>
+            <div class="stat-row"><span>✅ Pushed to OS</span><span class="stat-val" id="statCompleted">0</span></div>
+            <div class="stat-row"><span>❌ Failed</span><span class="stat-val" id="statFailed">0</span></div>
+            <div class="stat-row"><span>💾 Server Load</span><span class="stat-val" id="statTotalBytes">0 MB</span></div>
+        </div>
+        <div class="sidebar-footer">👻💀 GHOST DL v4.0 (OS Daemon)</div>
+    </aside>
+
+    <main class="main-content">
+        <div class="top-bar">
+            <h1>👻💀 <span style="color:#f5c842;">GHOST</span> Downloader</h1>
+            <span class="global-badge">⚡ Native Threading Engine</span>
+        </div>
+
+        <div class="input-card" id="inputCard">
+            <input type="text" id="urlInput" placeholder="🔗 Paste MediaFire URL here... (add multiple one by one)">
+            <select class="thread-select" id="threadsSelect" title="Threads per download">
+                <option value="2">⚡ 2 Threads</option>
+                <option value="4" selected>⚡ 4 Threads</option>
+                <option value="6">⚡ 6 Threads</option>
+                <option value="8">⚡ 8 Threads</option>
+                <option value="12">🔥 12 Threads</option>
+            </select>
+            <button class="btn btn-primary" onclick="addToQueue()" title="Add to download queue">➕ Add to Queue</button>
+            <button class="btn btn-secondary" onclick="clearCompleted()" title="Remove completed downloads">🧹 Clear Done</button>
+        </div>
+
+        <div class="section-title">
+            📥 Active Extraction <span class="count-badge" id="activeCount">0</span>
+        </div>
+        <div class="downloads-container" id="downloadsContainer">
+            <div style="color:#555;text-align:center;padding:40px;font-style:italic;">
+                👻 No downloads yet — add a MediaFire URL above!
+            </div>
+        </div>
+
+        <div class="section-title">📜 Event Log</div>
+        <div class="log-panel" id="logPanel">
+            <div class="log-entry">[System] 👻💀 GHOST DL initialized. Waiting for local daemon.</div>
+        </div>
+    </main>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        (function() {
+            // ==================== DAEMON PING CHECKER ====================
+            const DAEMON_URL = 'http://127.0.0.1:5000';
+            const offlineOverlay = document.getElementById('offlineOverlay');
+            
+            // Check every 2 seconds if the local backend is running
+            setInterval(() => {
+                fetch(`${DAEMON_URL}/api/ping`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.status === 'online') {
+                            offlineOverlay.style.opacity = '0';
+                            setTimeout(() => offlineOverlay.style.display = 'none', 300);
+                        }
+                    })
+                    .catch(err => {
+                        offlineOverlay.style.display = 'flex';
+                        setTimeout(() => offlineOverlay.style.opacity = '1', 10);
+                    });
+            }, 2000);
+
+            // ==================== DOM REFS ====================
+            const urlInput = document.getElementById('urlInput');
+            const threadsSelect = document.getElementById('threadsSelect');
+            const downloadsContainer = document.getElementById('downloadsContainer');
+            const logPanel = document.getElementById('logPanel');
+            const toastContainer = document.getElementById('toastContainer');
+            const activeCountEl = document.getElementById('activeCount');
+            const statQueued = document.getElementById('statQueued');
+            const statActive = document.getElementById('statActive');
+            const statCompleted = document.getElementById('statCompleted');
+            const statFailed = document.getElementById('statFailed');
+
+            // ==================== STATE ====================
+            let downloadTasks = [];
+            let fakeIdCounter = 9000;
+
+            // ==================== PARTICLE SYSTEM ====================
+            function spawnParticles() {
+                const container = document.getElementById('particleContainer');
+                const emojis = ['👻', '💀', '👻', '💀', '👻', '✨', '🦴', '👻'];
+                for (let i = 0; i < 18; i++) {
+                    const particle = document.createElement('span');
+                    particle.className = 'ghost-particle';
+                    particle.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                    particle.style.setProperty('--x', Math.random() * 94 + '%');
+                    particle.style.setProperty('--dur', (8 + Math.random() * 18) + 's');
+                    particle.style.setProperty('--sz', (18 + Math.random() * 40) + 'px');
+                    particle.style.setProperty('--op', (0.15 + Math.random() * 0.45));
+                    particle.style.setProperty('--drift', (Math.random() * 120 - 60) + 'px');
+                    particle.style.setProperty('--rot', (Math.random() * 360) + 'deg');
+                    particle.style.setProperty('--blur', Math.random() > 0.6 ? '1.5px' : '0px');
+                    particle.style.animationDelay = Math.random() * 15 + 's';
+                    container.appendChild(particle);
+                }
+            }
+            spawnParticles();
+
+            // ==================== TOAST & LOGS ====================
+            function showToast(message, duration = 2800) {
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                toast.textContent = message;
+                toastContainer.appendChild(toast);
+                setTimeout(() => { if (toast.parentNode) toast.remove(); }, duration + 400);
+            }
+
+            function log(message, type = '') {
+                const entry = document.createElement('div');
+                entry.className = 'log-entry ' + (type || '');
+                entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                logPanel.appendChild(entry);
+                logPanel.scrollTop = logPanel.scrollHeight;
+                while (logPanel.children.length > 200) logPanel.firstChild.remove();
+            }
+
+            // ==================== STATS UPDATE ====================
+            function updateStats() {
+                const queued = downloadTasks.filter(t => t.state === 'queued').length;
+                const active = downloadTasks.filter(t => t.state === 'downloading').length;
+                const completed = downloadTasks.filter(t => t.state === 'completed').length;
+                const failed = downloadTasks.filter(t => t.state === 'failed').length;
+                statQueued.textContent = queued;
+                statActive.textContent = active;
+                statCompleted.textContent = completed;
+                statFailed.textContent = failed;
+                activeCountEl.textContent = active;
+            }
+
+            // ==================== UI RENDERING ====================
+            function renderAllCards() {
+                downloadsContainer.innerHTML = '';
+                if (downloadTasks.length === 0) {
+                    downloadsContainer.innerHTML =
+                        '<div style="color:#555;text-align:center;padding:40px;font-style:italic;">👻 No downloads yet — add a MediaFire URL above!</div>';
+                } else {
+                    // Sort tasks: Active first, then Queued, Completed, Failed
+                    const sorted = [...downloadTasks].sort((a, b) => {
+                        const order = { 'downloading': 1, 'queued': 2, 'completed': 3, 'failed': 4 };
+                        return (order[a.state] || 5) - (order[b.state] || 5);
+                    });
+                    sorted.forEach(task => downloadsContainer.appendChild(createCardElement(task)));
+                }
+                updateStats();
+            }
+
+            function createCardElement(task) {
+                const card = document.createElement('div');
+                card.className = 'download-card ' + task.state;
+                card.setAttribute('data-task-id', task.id);
+                card.style.transformStyle = 'preserve-3d';
+
+                const progress = task.totalSize > 0 ? Math.min(100, Math.round((task.downloadedBytes / task.totalSize) * 100)) : 0;
+                const speedStr = task.speed > 0 ? (task.speed / (1024 * 1024)).toFixed(2) + ' MB/s' : '—';
+                const etaStr = task.speed > 0 && task.totalSize > 0 && task.downloadedBytes < task.totalSize ?
+                    formatETA((task.totalSize - task.downloadedBytes) / task.speed) : '—';
+                const sizeStr = task.totalSize > 0 ? formatBytes(task.totalSize) : 'Unknown size';
+                const downloadedStr = formatBytes(task.downloadedBytes);
+
+                let statusClass = 'status-queued';
+                let statusText = '⏳ Queued';
+
+                if (task.state === 'downloading') { 
+                    statusClass = 'status-downloading'; 
+                    statusText = '⚡ Downloading'; 
+                } else if (task.state === 'completed') { 
+                    statusClass = 'status-completed'; 
+                    statusText = '✅ Done'; 
+                } else if (task.state === 'failed') { 
+                    statusClass = 'status-failed'; 
+                    statusText = '❌ Failed'; 
+                }
+
+                const fileIcon = task.fileName.match(/\.(rar|zip|pkg|bin|iso|7z|tar|gz)$/i) ? '📦' : '📄';
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <span class="file-icon">${fileIcon}</span>
+                        <span class="file-name" title="${escapeHTML(task.fileName)}">${escapeHTML(task.fileName)}</span>
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="progress-wrap">
+                        <div class="progress-fill" style="width:${progress}%;"></div>
+                    </div>
+                    <div class="card-meta">
+                        <span>📊 ${progress}%</span>
+                        <span>💾 ${downloadedStr} / ${sizeStr}</span>
+                        <span>🚀 ${speedStr}</span>
+                        <span>⏱ ETA: ${etaStr}</span>
+                        <span>🧵 ${task.numThreads} threads (Daemon)</span>
+                    </div>
+                    <div class="card-actions">
+                        ${task.state === 'queued' ? `<button class="btn btn-danger btn-sm" onclick="removeTask('${task.id}')">🚫 Remove</button>` : ''}
+                        ${task.state === 'completed' || task.state === 'failed' ? `
+                            <button class="btn btn-secondary btn-sm" onclick="removeTask('${task.id}')">🗑 Clear from UI</button>
+                        ` : ''}
+                        ${task.error ? `<span style="color:#ff3b3b; font-size:0.7rem; margin-left:10px;">Error: ${task.error}</span>` : ''}
+                    </div>
+                `;
+                return card;
+            }
+
+            function updateCardVisuals(task) {
+                const existingCard = downloadsContainer.querySelector(`[data-task-id="${task.id}"]`);
+                if (existingCard) {
+                    existingCard.replaceWith(createCardElement(task));
+                } else {
+                    renderAllCards();
+                }
+                updateStats();
+            }
+
+            function escapeHTML(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            function formatBytes(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            function formatETA(seconds) {
+                if (!isFinite(seconds) || seconds < 0) return '—';
+                if (seconds < 60) return Math.round(seconds) + 's';
+                if (seconds < 3600) return Math.round(seconds / 60) + 'm ' + Math.round(seconds % 60) + 's';
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                return h + 'h ' + m + 'm';
+            }
+
+            // ==================== MODIFIED QUEUE LOGIC ====================
+            window.addToQueue = function() {
+                const url = urlInput.value.trim();
+                const threads = parseInt(threadsSelect.value) || 4;
+
+                if (!url) return showToast('⚠ Please paste a MediaFire URL!');
+                
+                // Add a local placeholder so the UI feels instantly responsive
+                let placeholderId = "local_" + (++fakeIdCounter);
+                let placeholderTask = {
+                    id: placeholderId,
+                    fileName: "Pinging Daemon...",
+                    state: 'queued',
+                    downloadedBytes: 0,
+                    totalSize: 0,
+                    numThreads: threads,
+                    speed: 0
+                };
+                downloadTasks.push(placeholderTask);
+                renderAllCards();
+                urlInput.value = '';
+                log(`[Queue] ➕ Sent link to Daemon`, '');
+
+                // Tell Python to start downloading
+                fetch(`${DAEMON_URL}/api/download`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url, threads: threads })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    // Remove the local placeholder since Python accepted it
+                    downloadTasks = downloadTasks.filter(t => t.id !== placeholderId);
+                    
+                    if(data.success) {
+                        log(`[Daemon] ✅ Task Registered: ${data.filename}`, 'success');
+                        showToast(`➕ Added — ${threads} threads 👻`);
+                    } else {
+                        log(`[Daemon] ❌ Error: ${data.error}`, 'error');
+                        showToast("Error: " + data.error);
+                    }
+                    renderAllCards();
+                })
+                .catch(err => {
+                    downloadTasks = downloadTasks.filter(t => t.id !== placeholderId);
+                    renderAllCards();
+                    log(`[Daemon] ❌ Failed to reach local engine`, 'error');
+                });
+            };
+
+            window.removeTask = function(id) {
+                downloadTasks = downloadTasks.filter(t => t.id !== id);
+                renderAllCards();
+            }
+
+            window.clearCompleted = function() {
+                downloadTasks = downloadTasks.filter(t => t.state === 'queued' || t.state === 'downloading');
+                renderAllCards();
+            }
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && document.activeElement === urlInput) addToQueue();
+            });
+
+            // ==================== LIVE PROGRESS POLLING ====================
+            // Every second, ask Python for the progress of all downloads and update your UI cards
+            setInterval(() => {
+                if(offlineOverlay.style.display === 'none') {
+                    fetch(`${DAEMON_URL}/api/progress`)
+                        .then(res => res.json())
+                        .then(tasks => {
+                            for (let id in tasks) {
+                                let t = tasks[id];
+                                let existing = downloadTasks.find(x => x.id === id);
+                                
+                                // Calculate speed (bytes per second, since this runs every 1s)
+                                let lastBytes = existing ? existing.downloadedBytes : 0;
+                                let byteDiff = t.downloaded - lastBytes;
+                                let currentSpeed = byteDiff > 0 ? byteDiff : (existing ? existing.speed : 0);
+                                if (t.state === 'completed' || t.state === 'failed') currentSpeed = 0;
+
+                                let taskObj = {
+                                    id: id,
+                                    fileName: t.filename || 'Resolving...',
+                                    state: t.state,
+                                    downloadedBytes: t.downloaded || 0,
+                                    totalSize: t.total_size || 0,
+                                    numThreads: t.threads || 4,
+                                    speed: currentSpeed,
+                                    error: t.error
+                                };
+
+                                if (existing) {
+                                    Object.assign(existing, taskObj);
+                                    updateCardVisuals(existing);
+                                } else {
+                                    downloadTasks.push(taskObj);
+                                    renderAllCards();
+                                }
+                            }
+                        })
+                        .catch(err => console.error("Polling Error:", err));
+                }
+            }, 1000);
+
+        })();
+    </script>
+</body>
+</html>
