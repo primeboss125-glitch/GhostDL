@@ -1,64 +1,85 @@
 #!/usr/bin/env bash
-# GhostDL - Cross-Platform Setup (Android + PC)
+# GhostDL - Cross-Platform Setup Script (Robust Version)
 set -e
 
-# Detect Termux (Android)
-if [ -d "/data/data/com.termux" ] || [ -n "$PREFIX" ] && [ "$PREFIX" = "/data/data/com.termux/files/usr" ]; then
+# --- Helper function for echoing messages ---
+echo_status() { echo -e "\n\033[1;34m[$(date +%H:%M:%S)]\033[0m \033[1;32m$1\033[0m"; }
+echo_error() { echo -e "\n\033[1;31mERROR:\033[0m $1"; }
+echo_warning() { echo -e "\n\033[1;33mWARNING:\033[0m $1"; }
+
+# --- 1. Environment Detection ---
+echo_status "Detecting your environment..."
+IS_TERMUX=false
+IS_WSL=false
+IS_MAC=false
+
+case "$OSTYPE" in
+  *linux-android*) IS_TERMUX=true ;;
+  darwin*) IS_MAC=true ;;
+  linux*)
+    if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then
+      IS_WSL=true
+    fi ;;
+esac
+
+# Fallback checks for Termux and WSL if OSTYPE detection fails
+if [ -d "/data/data/com.termux" ] && [ -n "$PREFIX" ]; then
     IS_TERMUX=true
-    echo " Detected Termux (Android)"
-else
-    IS_TERMUX=false
-    echo " Detected PC environment"
 fi
 
-sleep 1
+if [ -n "$WSL_DISTRO_NAME" ] || [ -n "$WSL_INTEROP" ]; then
+    IS_WSL=true
+fi
 
-# ---- Storage & Directory Setup ----
+# --- 2. Setup Directories ---
+echo_status "Setting up download directory..."
 if [ "$IS_TERMUX" = true ]; then
-    echo "[1/4] Linking system storage..."
+    echo "   Termux detected. Setting up storage..."
     termux-setup-storage
     sleep 2
     DOWNLOAD_DIR="$HOME/storage/downloads/GhostDL"
 else
-    echo "[1/4] Creating download directory..."
     DOWNLOAD_DIR="$HOME/Downloads/GhostDL"
 fi
 mkdir -p "$DOWNLOAD_DIR"
-echo "    Downloads will go to: $DOWNLOAD_DIR"
+echo "   Downloads will be saved to: $DOWNLOAD_DIR"
 
-# ---- Install Python & Dependencies ----
-echo "[2/4] Installing Python Engine..."
+# --- 3. Install Python and Dependencies ---
+echo_status "Installing Python environment (this may take a moment)..."
+
 if [ "$IS_TERMUX" = true ]; then
     pkg update -y && pkg upgrade -y
     pkg install -y python
+    PIP_CMD="pip"
 else
-    # For Linux/macOS/WSL
-    if command -v apt &> /dev/null; then
-        sudo apt update && sudo apt install -y python3 python3-pip
-    elif command -v brew &> /dev/null; then
-        brew install python3
+    # For Linux, macOS, WSL
+    if command -v python3 &> /dev/null; then
+        echo "   Python 3 found."
     else
-        echo "  Please install Python 3.8+ and pip manually."
-        exit 1
+        echo_warning "Python 3 not found. Attempting installation..."
+        if command -v apt &> /dev/null; then
+            sudo apt update && sudo apt install -y python3 python3-pip
+        elif command -v brew &> /dev/null && [ "$IS_MAC" = true ]; then
+            brew install python3
+        else
+            echo_error "Could not install Python automatically. Please install Python 3.8+ and pip manually."
+            exit 1
+        fi
     fi
-    # Ensure pip3 is used
     PIP_CMD="pip3"
 fi
 
-# Install Python packages
-if [ "$IS_TERMUX" = true ]; then
-    pip install flask flask-cors requests
-else
-    pip3 install flask flask-cors requests
-fi
+$PIP_CMD install --upgrade pip
+$PIP_CMD install flask flask-cors requests
 
-# ---- Deploy Ghost Engine ----
-echo "[3/4] Deploying Ghost Engine core..."
+# --- 4. Deploy the Ghost Engine Core ---
+echo_status "Deploying Ghost Engine core..."
 APP_URL="https://raw.githubusercontent.com/primeboss125-glitch/GhostDL/main/app.py"
 curl -sL "$APP_URL" -o "$HOME/GhostDL.py"
+echo "   Engine downloaded."
 
-# ---- Create launcher script ----
-echo "[4/4] Creating launcher..."
+# --- 5. Create the Launcher Script ---
+echo_status "Creating the 'ghost-dl' launcher..."
 LAUNCHER_PATH="$HOME/.local/bin/ghost-dl"
 mkdir -p "$HOME/.local/bin"
 cat > "$LAUNCHER_PATH" << 'EOF'
@@ -67,27 +88,25 @@ cd "$HOME" && python3 GhostDL.py
 EOF
 chmod +x "$LAUNCHER_PATH"
 
-# Add to PATH if not already there
+# Add ~/.local/bin to PATH if it's not already there
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc" 2>/dev/null || true
+    if [ -n "$ZSH_VERSION" ]; then
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc"
+    fi
+    echo "   PATH entry added."
 fi
 
-# ---- Final message ----
-echo ""
-echo " SETUP COMPLETE!"
-echo " Files saved to: $DOWNLOAD_DIR"
-echo " To start GhostDL, run: ghost-dl"
-echo ""
-echo " Then open your browser at: https://primeboss125-glitch.github.io/GhostDL/"
-echo "   (Make sure the daemon is running on http://127.0.0.1:5000)"
+# --- 6. Final Message and Execution ---
+echo_status "Setup Complete! "
+echo "   Downloads will be saved to: $DOWNLOAD_DIR"
+echo "   To start the engine manually at any time, just run: ghost-dl"
+echo "   Open your browser and go to: https://primeboss125-glitch.github.io/GhostDL/"
 
-# ---- Auto-start if in Termux ----
-if [ "$IS_TERMUX" = true ]; then
+if [ "$IS_TERMUX" = true ] || [ "$IS_WSL" = true ]; then
+    echo_status "Starting Ghost Engine for you..."
     export PATH="$HOME/.local/bin:$PATH"
-    echo " Booting Engine (Termux)..."
     ghost-dl
 else
-    echo ""
-    echo " Run 'ghost-dl' in a separate terminal to start the daemon."
+    echo_status "On standard Linux/macOS, please start the engine by running: ghost-dl"
 fi
