@@ -1,34 +1,93 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
+# GhostDL - Cross-Platform Setup (Android + PC)
+set -e
 
-echo "👻 Initializing Ghostd3m-Elite Setup..."
-sleep 2
+# Detect Termux (Android)
+if [ -d "/data/data/com.termux" ] || [ -n "$PREFIX" ] && [ "$PREFIX" = "/data/data/com.termux/files/usr" ]; then
+    IS_TERMUX=true
+    echo " Detected Termux (Android)"
+else
+    IS_TERMUX=false
+    echo " Detected PC environment"
+fi
 
-# 1. Request Android Storage Permissions
-echo "[1/4] Linking system storage..."
-termux-setup-storage
-sleep 2
+sleep 1
 
-# 2. Install Python Core and Dependencies quietly
-echo "[2/4] Installing Python Engine (this may take a minute)..."
-pkg update -y && pkg upgrade -y
-pkg install python -y
-pip install flask flask-cors requests
+# ---- Storage & Directory Setup ----
+if [ "$IS_TERMUX" = true ]; then
+    echo "[1/4] Linking system storage..."
+    termux-setup-storage
+    sleep 2
+    DOWNLOAD_DIR="$HOME/storage/downloads/GhostDL"
+else
+    echo "[1/4] Creating download directory..."
+    DOWNLOAD_DIR="$HOME/Downloads/GhostDL"
+fi
+mkdir -p "$DOWNLOAD_DIR"
+echo "    Downloads will go to: $DOWNLOAD_DIR"
 
-# 3. Create the Download Directory
-mkdir -p ~/storage/downloads/GhostDL
+# ---- Install Python & Dependencies ----
+echo "[2/4] Installing Python Engine..."
+if [ "$IS_TERMUX" = true ]; then
+    pkg update -y && pkg upgrade -y
+    pkg install -y python
+else
+    # For Linux/macOS/WSL
+    if command -v apt &> /dev/null; then
+        sudo apt update && sudo apt install -y python3 python3-pip
+    elif command -v brew &> /dev/null; then
+        brew install python3
+    else
+        echo "  Please install Python 3.8+ and pip manually."
+        exit 1
+    fi
+    # Ensure pip3 is used
+    PIP_CMD="pip3"
+fi
 
-# 4. Fetch the Python Daemon from your GitHub (REPLACE THE URL BELOW)
+# Install Python packages
+if [ "$IS_TERMUX" = true ]; then
+    pip install flask flask-cors requests
+else
+    pip3 install flask flask-cors requests
+fi
+
+# ---- Deploy Ghost Engine ----
 echo "[3/4] Deploying Ghost Engine core..."
-# IMPORTANT: Replace the URL below with the RAW GitHub link to your app.py
-curl -sL https://raw.githubusercontent.com/YOUR_USERNAME/GhostDL/main/app.py -o ~/app.py
+APP_URL="https://raw.githubusercontent.com/primeboss125-glitch/GhostDL/main/app.py"
+curl -sL "$APP_URL" -o "$HOME/GhostDL.py"
 
-# 5. Create a permanent shortcut command
-echo "[4/4] Writing boot scripts..."
-echo "python ~/app.py" > /data/data/com.termux/files/usr/bin/ghost-dl
-chmod +x /data/data/com.termux/files/usr/bin/ghost-dl
+# ---- Create launcher script ----
+echo "[4/4] Creating launcher..."
+LAUNCHER_PATH="$HOME/.local/bin/ghost-dl"
+mkdir -p "$HOME/.local/bin"
+cat > "$LAUNCHER_PATH" << 'EOF'
+#!/usr/bin/env bash
+cd "$HOME" && python3 GhostDL.py
+EOF
+chmod +x "$LAUNCHER_PATH"
 
+# Add to PATH if not already there
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc" 2>/dev/null || true
+fi
+
+# ---- Final message ----
 echo ""
-echo "✅ SETUP COMPLETE!"
-echo "💾 Files will be saved to: Internal Storage/Download/GhostDL"
-echo "🔥 Booting Engine..."
-ghost-dl
+echo " SETUP COMPLETE!"
+echo " Files saved to: $DOWNLOAD_DIR"
+echo " To start GhostDL, run: ghost-dl"
+echo ""
+echo " Then open your browser at: https://primeboss125-glitch.github.io/GhostDL/"
+echo "   (Make sure the daemon is running on http://127.0.0.1:5000)"
+
+# ---- Auto-start if in Termux ----
+if [ "$IS_TERMUX" = true ]; then
+    export PATH="$HOME/.local/bin:$PATH"
+    echo " Booting Engine (Termux)..."
+    ghost-dl
+else
+    echo ""
+    echo " Run 'ghost-dl' in a separate terminal to start the daemon."
+fi
